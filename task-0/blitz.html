@@ -1,0 +1,164 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Blitz</title>
+<style>
+:root {
+  --bg: #f4f5f7; --card: #fff; --fg: #1b1f24; --muted: #6b7280; --accent: #00b336;
+  --danger: #e5383b; --code-bg: #f0f2f5; --border: #dde1e6;
+}
+* { box-sizing: border-box; }
+html, body { height: 100%; margin: 0; }
+body {
+  background: var(--bg); color: var(--fg);
+  font: 18px/1.5 -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  display: flex; flex-direction: column;
+}
+main { flex: 1; display: flex; align-items: center; justify-content: center; padding: 16px; }
+.card {
+  background: var(--card); border: 1px solid var(--border); border-radius: 16px;
+  width: min(1100px, 100%); min-height: 480px; padding: 32px; display: flex; flex-direction: column;
+  box-shadow: 0 8px 30px rgba(0,0,0,.08);
+}
+.meta { display: flex; justify-content: space-between; align-items: center; color: var(--muted); font-size: 15px; gap: 12px; }
+.topic { text-transform: uppercase; letter-spacing: .06em; font-weight: 600; color: var(--accent); }
+.timer { font: 600 34px/1 ui-monospace, SFMono-Regular, Menlo, monospace; font-variant-numeric: tabular-nums; color: var(--fg); }
+.timer.over { color: var(--danger); }
+.q { font-size: 26px; font-weight: 600; margin: 28px 0 16px; }
+code { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: .88em; background: var(--code-bg); padding: 1px 6px; border-radius: 5px; }
+pre { background: var(--code-bg); border: 1px solid var(--border); border-radius: 10px; padding: 16px; white-space: pre-wrap; font-size: 16px; line-height: 1.45; margin: 0 0 8px; }
+pre code { background: none; padding: 0; font-size: inherit; }
+.k { color: #cf222e; } .s { color: #0a3069; } .c { color: #6e7781; font-style: italic; }
+.d { color: #8250df; } .b { color: #0550ae; } .n { color: #0550ae; } .f { color: #8250df; }
+nav { display: flex; justify-content: center; align-items: center; gap: 12px; padding: 0 16px 20px; flex-wrap: wrap; }
+button {
+  font: inherit; font-size: 16px; padding: 10px 18px; border-radius: 10px; cursor: pointer;
+  border: 1px solid var(--border); background: var(--card); color: var(--fg);
+}
+button:hover { border-color: var(--accent); }
+button:disabled { opacity: .4; cursor: default; }
+button.primary { background: var(--accent); border-color: var(--accent); color: #fff; font-weight: 600; }
+.counter { color: var(--muted); font-size: 15px; min-width: 70px; text-align: center; }
+.start h1 { margin: 0 0 8px; font-size: 40px; }
+.start ul { padding-left: 22px; }
+.start .go { margin-top: auto; align-self: flex-start; font-size: 20px; padding: 14px 32px; }
+kbd { font-family: ui-monospace, Menlo, monospace; font-size: .85em; border: 1px solid var(--border); border-bottom-width: 2px; border-radius: 5px; padding: 0 6px; background: var(--code-bg); }
+@media (max-width: 600px) { .card { padding: 20px; } .q { font-size: 21px; } .timer { font-size: 26px; } }
+</style>
+</head>
+<body>
+<main id="app"></main>
+<nav id="nav" hidden>
+  <button id="prev">← Back</button>
+  <span class="counter" id="counter"></span>
+  <button id="next" class="primary">Next →</button>
+</nav>
+<script>
+const LIMIT = 90;
+const Q = [
+  ["Python / async / FastAPI", "Why use <code>lifespan</code>?"],
+  ["Python / async / FastAPI", "Why not return a SQLAlchemy model directly in a response?"],
+  ["Python / async / FastAPI", "How do you limit the number of concurrent LLM API calls?"],
+  ["Python / async / FastAPI", "You need to call a synchronous library from async code. How?"],
+  ["SQLAlchemy + PG", "Accessing a relationship in async raises <code>MissingGreenlet</code>. Why?"],
+  ["SQLAlchemy + PG", "Can one <code>AsyncSession</code> be shared between concurrent tasks?"],
+  ["SQLAlchemy + PG", "Alembic autogenerate: can you trust it?"],
+  ["Redis", "Can Redis be used as the primary storage?"],
+  ["Redis", "Caching LLM responses: what to consider?"],
+  ["S3", "How can a client upload a large file without passing it through the service?"],
+  ["S3", "boto3 in an async service?"],
+  ["S3", "\"Folders\" and renaming in S3?"],
+  ["LangChain + LangGraph", "LangChain vs LangGraph?"],
+  ["LangChain + LangGraph", "How do you debug a chain in production?"],
+  ["LangChain + LangGraph", "How do you get structured output?"],
+  ["LangChain + LangGraph", "When LangChain, and when the raw SDK?"],
+  ["Tenacity", "You wrapped an OpenAI/Anthropic SDK call in <code>@retry(stop=stop_after_attempt(3))</code>. What can go wrong?"],
+  ["Tenacity", "<code>retry=retry_if_exception_type(Exception)</code>: what's the problem?"],
+  ["Tenacity", "Why <code>wait_exponential_jitter</code> instead of a fixed delay?"],
+  ["Tenacity", "Retries + POST: what should you check?"],
+  ["Docker + k8s + Jenkins", "How do you speed up a Jenkins build?"],
+  ["Docker + k8s + Jenkins", "Where do you store credentials in Jenkins?"],
+  ["EntraID", "A service must call a downstream API on behalf of the user. Which authentication flow?"],
+  ["What's wrong?", "<pre><code>@app.get(\"/summary\")\nasync def summary(doc_id: str):\n    doc = requests.get(f\"{STORAGE}/{doc_id}\").json()\n    return await llm.summarize(doc)</code></pre>"],
+  ["What's wrong?", "<pre><code>@retry(stop=stop_after_attempt(5), retry=retry_if_exception_type(Exception))\nasync def ask(prompt):\n    return await client.messages.create(model=M, messages=[...])  # max_retries=2 by default</code></pre>"],
+  ["What's wrong?", "<pre><code>async with session.begin():\n    user = await session.get(User, uid)\nreturn [p.title for p in user.projects]</code></pre>"],
+];
+
+const app = document.getElementById("app"), nav = document.getElementById("nav");
+const $ = id => document.getElementById(id);
+const spent = Q.map(() => 0);   // seconds already spent on each card
+let i = -1, enteredAt = 0, tick = null;
+
+function fmt(left) {
+  const a = Math.abs(left);
+  return (left < 0 ? "−" : "") + Math.floor(a / 60) + ":" + String(a % 60).padStart(2, "0");
+}
+function elapsed() { return spent[i] + Math.floor((Date.now() - enteredAt) / 1000); }
+function renderTimer() {
+  const left = LIMIT - elapsed(), t = $("timer");
+  t.textContent = fmt(left);
+  t.classList.toggle("over", left < 0);
+}
+function leave() {
+  if (i >= 0) spent[i] = elapsed();
+  clearInterval(tick);
+}
+function show(n) {
+  if (n < 0 || n >= Q.length) return;
+  leave();
+  i = n;
+  const [topic, q] = Q[i];
+  app.innerHTML = `<article class="card">
+    <div class="meta"><span class="topic">${topic}</span><span class="timer" id="timer"></span></div>
+    <div class="q">${q}</div>
+  </article>`;
+  $("counter").textContent = `${i + 1} / ${Q.length}`;
+  $("prev").disabled = i === 0;
+  $("next").disabled = i === Q.length - 1;
+  app.querySelectorAll("code").forEach(highlight);
+  enteredAt = Date.now();
+  renderTimer();
+  tick = setInterval(renderTimer, 250);
+}
+// Inline Python highlighter (no external scripts allowed by the host CSP).
+const KW = "False|None|True|and|as|assert|async|await|break|class|continue|def|del|elif|else|except|finally|for|from|global|if|import|in|is|lambda|nonlocal|not|or|pass|raise|return|try|while|with|yield";
+const BI = "print|len|range|str|int|float|dict|list|set|tuple|bool|type|isinstance|super|open|Exception|KeyboardInterrupt|self";
+const PY = new RegExp(`(#.*$)|([rbfRBF]{0,2}"(?:[^"\\\\\n]|\\\\.)*"|[rbfRBF]{0,2}'(?:[^'\\\\\n]|\\\\.)*')|(@[\\w.]+)|\\b(${KW})\\b|\\b(${BI})\\b|\\b(\\d+(?:\\.\\d+)?)\\b|\\b([A-Za-z_]\\w*)(?=\\()`, "gm");
+const esc = t => t.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+function highlight(el) {
+  const src = el.textContent;
+  let out = "", last = 0;
+  for (const m of src.matchAll(PY)) {
+    const cls = ["c", "s", "d", "k", "b", "n", "f"][m.slice(1).findIndex(g => g !== undefined)];
+    out += esc(src.slice(last, m.index)) + `<span class="${cls}">${esc(m[0])}</span>`;
+    last = m.index + m[0].length;
+  }
+  el.innerHTML = out + esc(src.slice(last));
+}
+function start() { nav.hidden = false; show(0); }
+
+app.innerHTML = `<article class="card start">
+  <h1>Blitz</h1>
+  <p>${Q.length} short questions. Keep answers brief — the gist, no details.</p>
+  <ul>
+    <li><b>1:30</b> per question. After zero the timer turns red and counts into negative.</li>
+    <li>Don't know? Just say so and we move on.</li>
+    <li>Navigation: <kbd>→</kbd> / <kbd>Space</kbd> — next, <kbd>←</kbd> — back, or the buttons below.</li>
+  </ul>
+  <button class="primary go" id="go">Start</button>
+</article>`;
+$("go").onclick = start;
+$("prev").onclick = () => show(i - 1);
+$("next").onclick = () => show(i + 1);
+
+document.addEventListener("keydown", e => {
+  if (e.metaKey || e.ctrlKey || e.altKey) return;
+  if (i < 0) { if (e.key === " " || e.key === "Enter" || e.key === "ArrowRight") { e.preventDefault(); start(); } return; }
+  if (e.key === "ArrowRight" || e.key === " ") { e.preventDefault(); show(i + 1); }
+  else if (e.key === "ArrowLeft") { e.preventDefault(); show(i - 1); }
+});
+</script>
+</body>
+</html>
