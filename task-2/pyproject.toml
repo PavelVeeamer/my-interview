@@ -5,3 +5,6 @@ requires-python = ">=3.11"
 
 [dependency-groups]
 dev = ["pytest"]
+
+[tool.pytest.ini_options]
+pythonpath = ["src"]
